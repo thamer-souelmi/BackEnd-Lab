@@ -33,11 +33,27 @@ def update(_id: str, payload: LivreModel):
     return updated
 
 
+from fastapi import Depends, HTTPException
+
 @router.get(LIVRE_URL, dependencies=[Depends(verify_token)])
-def get_all(query_params: dict = {}):
-    criteria = Filters(**query_params)
-    models = service.get_all_models(filters=criteria)
-    return models
+def get_all(
+    page: int = 1,
+    limit: int = 10,
+    auteur: str = None,
+    annee: int = None
+):
+    if page < 1:
+        raise HTTPException(status_code=400, detail="Page must be >= 1")
+
+    if limit < 1 or limit > 100:
+        raise HTTPException(status_code=400, detail="Limit must be between 1 and 100")
+
+    return service.get_all_models(
+        page=page,
+        limit=limit,
+        auteur=auteur,
+        annee=annee
+    )
 
 
 @router.get(f"{LIVRE_URL}/{{_id}}", dependencies=[Depends(verify_token)])

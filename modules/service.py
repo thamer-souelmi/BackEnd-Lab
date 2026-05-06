@@ -1,9 +1,7 @@
 from modules.schema import livre_schema
-from modules.livres import LivreModel, LivreModelResult
+from modules.livres import LivreModel
 from config.database import mongo_client
 from bson import ObjectId
-from pymongoose import methods
-from common.helpers.filters import Filters
 
 
 class BookService:
@@ -11,20 +9,34 @@ class BookService:
         self.schema = livre_schema
         self.collection = mongo_client["livres"]
 
-    def get_all_models(self, filters):
-        query = {}  # ignore filters for now
+    def get_all_models(self, page=1, limit=10, auteur=None, annee=None):
+        query = {}
 
-        cursor = self.collection.find(query)
+        # 🔎 Filtering
+        if auteur:
+            query["auteur"] = {"$regex": auteur, "$options": "i"}  # case-insensitive
+
+        if annee:
+            query["annee"] = annee
+
+        # 📄 Pagination
+        skip = (page - 1) * limit
+
+        cursor = self.collection.find(query).skip(skip).limit(limit)
+        total = self.collection.count_documents(query)
 
         results = []
         for doc in cursor:
-            doc["_id"] = str(doc["_id"])  # convert ObjectId
+            doc["_id"] = str(doc["_id"])  # convert ObjectId → string
             results.append(LivreModel.model_validate(doc))
 
-        return LivreModelResult(
-            total=len(results),
-            results=results
-        )
+        return {
+            "page": page,
+            "limit": limit,
+            "total": total,
+            "pages": (total // limit) + (1 if total % limit else 0),
+            "results": results
+        }
 
     def add_model(self, model: LivreModel):
         serialized_data = model.model_dump(exclude_none=True)
